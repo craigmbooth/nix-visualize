@@ -8,26 +8,24 @@ import shlex
 import subprocess
 
 import networkx as nx
-import matplotlib
-matplotlib.use('Agg')
+#import matplotlib
+#matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
+import util
+
+#: Default values for things we expect in the config file
 CONFIG_OPTIONS = {
     "aspect_ratio": (2, int),
     "style_scale": (1.0, float),
-    "edge_color": ("#888888", str)
+    "edge_color": ("#888888", str),
+    "y_sublevels": (5, int),
+    "y_sublevel_spacing": (0.2, float),
+    "num_iterations": (100, int),
+    "max_displacement": (2.5, float),
+    "repulsive_force_normalization": (2.0, float),
+    "attractive_force_normalization": (1.0, float)
     }
-
-class TreeCLIError(Exception):
-    pass
-
-
-def remove_nix_hash(string):
-    """Given a nix store name of the form <hash>-<packagename>, remove
-    the hash
-    """
-    return "-".join(string.split("-")[1:])
-
 
 class Edge(object):
     """Class represents the relationship between two packages."""
@@ -35,8 +33,8 @@ class Edge(object):
     def __init__(self, node_from, node_to):
         self.nfrom_raw=node_from
         self.nto_raw=node_to
-        self.nfrom = remove_nix_hash(os.path.basename(self.nfrom_raw))
-        self.nto = remove_nix_hash(os.path.basename(self.nto_raw))
+        self.nfrom = util.remove_nix_hash(os.path.basename(self.nfrom_raw))
+        self.nto = util.remove_nix_hash(os.path.basename(self.nto_raw))
 
     def __repr__(self):
         return "{} -> {}".format(self.nfrom, self.nto)
@@ -47,7 +45,7 @@ class Node(object):
 
     def __init__(self, name):
         self.raw_name = name
-        self.name = remove_nix_hash(self.raw_name)
+        self.name = util.remove_nix_hash(self.raw_name)
         self.children = []
         self.parents = []
         self.in_degree = 0
@@ -105,7 +103,7 @@ class Graph(object):
         res = subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE)
         raw_graph, _ = res.communicate()
 
-        self.root_package_name = remove_nix_hash(os.path.basename(package))
+        self.root_package_name = util.remove_nix_hash(os.path.basename(package))
 
         self.nodes, self.edges = self._get_edges_and_nodes(raw_graph)
 
@@ -144,7 +142,7 @@ class Graph(object):
             configs.read(configfile)
             if len(configs.sections()) > 1:
                 if configsection is None:
-                    raise TreeCLIError("Config file {} contains more than "
+                    raise util.TreeCLIError("Config file {} contains more than "
                                        "one section, so -s must be set")
             else:
                 configsection = configs.sections()[0]
@@ -194,7 +192,19 @@ class Graph(object):
 
 
     def _add_pos_to_nodes(self):
+        """Populates every node with an x an y position using the following
+        iterative algorithm:
 
+           * start at t=0
+           * Apply an x force to each node that is proportional to the offset
+             between its x position and the average position of its parents
+           * Apply an x force to each node that pushes it away from its siblings
+             with a force proportional to 1/d, where d is the distance between
+             the node and its neighbor
+           * advance time forward by dt=tmax/num_iterations, displace particles
+             by F*dt
+           * XXXXX
+        """
 
         #: The distance between levels in arbitrary units.  Used to set a
         #: scale on the diagram
@@ -203,91 +213,71 @@ class Graph(object):
         # Time to integrate for
         tmax = 30.0
 
-        #: Number of y-splits for each level
-        y_levels = 5
-        #: Fraction of a level that each split is
-        y_space = 0.2
-        #: Maximum number of iterations to perform
-        num_iterations = 600
-
         #: Maximum displacement of a point on a single iteration
-        max_displacement = level_height * 2.5
+        max_displacement = level_height * self.config["max_displacement"]
 
-        #: Factor by which we boost the repulsive force
-        norml_sib = 10
+        #: The timestep to take on each iteration
+        dt = tmax/self.config["num_iterations"]
 
-        dt = tmax/num_iterations
-
-        # y position is easy, just use the level.  Initialize x with
-        # a random position unless you're the top level package, then
-        # put it in the middle
+        # Initialize x with a random position unless you're the top level
+        # package, then set x=0
         for n in self.nodes:
-            n.y = (self.depth - n.level) * level_height
             if n.level == 0:
-                n.x = 0
+                n.x = 500
+                n.y = self.depth * level_height
             else:
-                n.x = 1000*(random.random())
+                n.x = 1000*random.random()
 
         iframe = 0
-        for iternum in range(num_iterations):
+        for iternum in range(self.config["num_iterations"]):
 
             total_abs_displacement = 0.0
 
-            for level in range(self.depth):
-                if level == 0:
-                    continue
+            for level in range(1, self.depth):
 
                 # Get the y-offset by cycling with other nodes in the
                 # same level
                 xpos = [(x.name, x.x) for x in self.level(level)]
                 xpos = sorted(xpos, key=lambda x:x[1])
-                xpos = zip(xpos, itertools.cycle(range(y_levels)))
+                xpos = zip(xpos,
+                           itertools.cycle(range(self.config["y_sublevels"])))
                 pos_sorter = {x[0][0]: x[1] for x in xpos}
 
                 for n in self.level(level):
                     n.y = ((self.depth - n.level) * level_height +
-                           pos_sorter[n.name]*y_space*level_height)
+                           pos_sorter[n.name] *
+                           self.config["y_sublevel_spacing"]*level_height)
 
 
                 for lev_node in self.level(level):
-
                     # We pull nodes toward their parents
                     dis = [parent.x - lev_node.x for
                            parent in lev_node.parents]
 
+                    # And push nodes away from their siblings with force 1/r
                     sibs = self.level(level)
                     sdis = [1.0/(sib.x - lev_node.x) for
                             sib in sibs if abs(sib.x-lev_node.x) > 1e-3]
 
-                    total_sdis = sum(sdis) * norml_sib
-                    total_displacement = float(sum(dis)) / len(dis)
+                    total_sdis = (
+                        sum(sdis) *
+                        self.config["repulsive_force_normalization"])
+                    total_displacement = (
+                        self.config["attractive_force_normalization"] *
+                        float(sum(dis)) / len(dis))
 
-                    if total_displacement > max_displacement:
-                        dx_parent = max_displacement
-                    elif total_displacement < -max_displacement:
-                        dx_parent = -max_displacement
-                    else:
-                        dx_parent = total_displacement
-
-                    if total_sdis > max_displacement:
-                        dx_sibling = max_displacement
-                    elif total_sdis < -max_displacement:
-                        dx_sibling = -max_displacement
-                    else:
-                        dx_sibling = total_sdis
-
+                    # Limit each of the displacements to the max displacement
+                    dx_parent = util.clamp(total_displacement, max_displacement)
                     lev_node.dx_parent = dx_parent
-                    lev_node.dx_sibling = -dx_sibling
 
+                    dx_sibling = util.clamp(total_sdis, max_displacement)
+                    lev_node.dx_sibling = -dx_sibling
 
                 for lev_node in self.level(level):
                     lev_node.x += lev_node.dx_parent * dt
                     lev_node.x += lev_node.dx_sibling * dt
-                    total_abs_displacement += abs(lev_node.dx_parent * dt)
-                    total_abs_displacement += abs(lev_node.dx_sibling * dt)
-
-            #print "In iteration {}, total displacement: {}".format(iternum,
-            #          total_abs_displacement)
+                    total_abs_displacement += (abs(lev_node.dx_parent * dt) +
+                                               abs(lev_node.dx_sibling * dt))
 
 
     def level(self, level):
@@ -296,6 +286,7 @@ class Graph(object):
         return [x for x in self.nodes if x.level == level]
 
     def levels(self, min_level=0):
+        """An iterator over levels, yields all the nodes in each level"""
         for i in range(min_level,self.depth):
             yield self.level(i)
 
@@ -309,6 +300,7 @@ class Graph(object):
         """Transform a raw GraphViz file into Node and Edge objects.  Note
         that at this point the nodes and edges are not linked into a graph
         they are simply two lists of items."""
+
         all_edges = []
         all_nodes = []
 
@@ -331,7 +323,8 @@ class Graph(object):
             else:
                 parts = raw_line.split(" ")
                 name = parts[0].replace('"', "")
-                if remove_nix_hash(name) not in [n.name for n in all_nodes]:
+                if (util.remove_nix_hash(name) not
+                        in [n.name for n in all_nodes]):
                     all_nodes.append(Node(name))
 
         return all_nodes, all_edges
@@ -358,7 +351,6 @@ class Graph(object):
 
         head = self.level(0)
         ret_str = "Graph of package: {}".format(head[0].name)
-        ilevel = 1
         for ilevel, level in enumerate(self.levels(min_level=1)):
             ret_str += "\n\tOn level {} there are {} packages".format(
                 ilevel+1, len(level))
