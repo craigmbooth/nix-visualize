@@ -28,3 +28,5 @@ Initially the horizontal positions for packages are chosen randomly, but the str
 
 1. A package should be vertically aligned with the things it depends upon (i.e. the nodes on the level above it that it is linked to), in order to minimize edge crossing as far as possible
 2. A package should try not to be too close to another package on the same level, so as not to have nodes overlap.
+
+<img src="images/sublevels.png">
