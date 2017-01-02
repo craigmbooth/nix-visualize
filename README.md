@@ -1,2 +1,9 @@
-# nix-dependency-visualizer
-Uses the Nix package manager to visualize the dependencies of a given package
+# Nix Dependency Visualizer
+
+Script that automates the generation of pretty dependency graphs from the output of ``nix-store -q --graph <package>``.
+
+## Command Line Options
+
+## Configuration Files
+
+## Graph Layout Algorithm

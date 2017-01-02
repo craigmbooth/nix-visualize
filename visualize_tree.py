@@ -6,8 +6,12 @@ import os
 import random
 import shlex
 import subprocess
+import sys
 
 import networkx as nx
+import pygraphviz as pgv
+import tempfile
+
 #import matplotlib
 #matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -63,15 +67,15 @@ class Node(object):
         self.children.append(nfrom)
         self.in_degree = len(self.children)
 
-
     def add_level(self):
         """Add the Node's level.  Level is this package's position in the
         hierarchy.  0 is the top-level package.  That package's dependencies
         are level 1, their dependencies are level 2.
         """
+
         if self.level >= 0:
             return self.level
-        if len(self.parents) > 0:
+        elif len(self.parents) > 0:
             parent_levels =  [p.add_level() for p in self.parents]
             self.level = max(parent_levels) + 1
             return self.level
@@ -96,14 +100,14 @@ class Graph(object):
         self.nodes = []
         self.edges = []
 
+        self.root_package_name = util.remove_nix_hash(os.path.basename(package))
+
         # Run nix-store -q --graph <package>.  This generates a graphviz
         # file with package dependencies
         cmd = ("/nix/store/lzradzr5c38amahvqfra9g7rp8wfw2f0-nix-1.11.4/"
               "bin/nix-store -q --graph {}".format(package))
         res = subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE)
         raw_graph, _ = res.communicate()
-
-        self.root_package_name = util.remove_nix_hash(os.path.basename(package))
 
         self.nodes, self.edges = self._get_edges_and_nodes(raw_graph)
 
@@ -301,31 +305,21 @@ class Graph(object):
         that at this point the nodes and edges are not linked into a graph
         they are simply two lists of items."""
 
+        tempf = tempfile.NamedTemporaryFile(delete=False)
+        tempf.write(raw_lines)
+        tempf.close()
+        G = pgv.AGraph(tempf.name)
+
         all_edges = []
         all_nodes = []
 
-        for raw_line in raw_lines.split("\n"):
-            raw_line = raw_line.rstrip("\n")
+        for node in G.nodes():
+            if (util.remove_nix_hash(node.name) not
+                    in [n.name for n in all_nodes]):
+                all_nodes.append(Node(node.name))
 
-            if raw_line.startswith("digraph"):
-                continue
-
-            # This is a dumb heuristic, but ensures that we don't have the
-            # "Grammar" lines in there like closing brackets, etc.
-            if len(raw_line) < 5:
-                continue
-
-            if "->" in raw_line:
-                parts = raw_line.split(" ")
-                nfrom = parts[0].replace('"', "")
-                nto = parts[2].replace('"', "")
-                all_edges.append(Edge(nfrom, nto))
-            else:
-                parts = raw_line.split(" ")
-                name = parts[0].replace('"', "")
-                if (util.remove_nix_hash(name) not
-                        in [n.name for n in all_nodes]):
-                    all_nodes.append(Node(name))
+        for edge in G.edges():
+            all_edges.append(Edge(edge[0], edge[1]))
 
         return all_nodes, all_edges
 
@@ -335,14 +329,14 @@ class Graph(object):
         """
 
         for edge in self.edges:
-
             nfrom = [n for n in self.nodes if n.name == edge.nfrom]
             nto = [n for n in self.nodes if n.name == edge.nto]
             nfrom = nfrom[0]
             nto = nto[0]
-
-            nfrom.add_parent(nfrom, nto)
-            nto.add_child(nfrom, nto)
+            if nto not in nfrom.parents:
+                nfrom.add_parent(nfrom, nto)
+            if nfrom not in nto.children:
+                nto.add_child(nfrom, nto)
 
     def __repr__(self):
         """Basic print of Graph, show the package name and the number of
