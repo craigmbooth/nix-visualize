@@ -7,3 +7,5 @@ Script that automates the generation of pretty dependency graphs from the output
 ## Configuration Files
 
 ## Graph Layout Algorithm
+
+![Demonstration of leveling algorithm](images/levels.png)
