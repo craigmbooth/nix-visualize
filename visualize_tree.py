@@ -26,7 +26,11 @@ CONFIG_OPTIONS = {
     "num_iterations": (100, int),
     "max_displacement": (2.5, float),
     "repulsive_force_normalization": (2.0, float),
-    "attractive_force_normalization": (1.0, float)
+    "attractive_force_normalization": (1.0, float),
+    "add_size_per_out_link": (200, int),
+    "max_node_size_over_min_node_size": (5.0, float),
+    "tmax": (30.0, float),
+    "show_labels": (1, int)
 }
 
 class Graph(object):
@@ -86,12 +90,14 @@ class Graph(object):
                                        "one section, so -s must be set")
             else:
                 configsection = configs.sections()[0]
+        else:
+            return {k: v[0] for k, v in CONFIG_OPTIONS.iteritems()}
 
         for param, (p_default, p_dtype) in CONFIG_OPTIONS.iteritems():
             try:
                 return_configs[param] = p_dtype(
                     configs.get(configsection, param))
-            except ConfigParser.NoOptionError:
+            except (ConfigParser.NoOptionError, ValueError):
                 return_configs[param] = p_dtype(p_default)
                 if verbose is True:
                     print "Adding default of {} for {}".format(
@@ -105,30 +111,29 @@ class Graph(object):
         col = [x.level for x in self.G.nodes()]
 
         img_y_height=24
-        # MORE PARAMETERS HERE!
-        size_per_out = 200   #PARAMETER
 
         size_min = 300 * self.config["style_scale"]
-        size_max = 5.0 * size_min  #PARAMETER
+        size_max = self.config["max_node_size_over_min_node_size"] * size_min
 
         plt.figure(1, figsize=(img_y_height*self.config["aspect_ratio"],
                                img_y_height))
-        node_size = [min(size_min + (x.out_degree-1)*size_per_out,
+        node_size = [min(size_min + (x.out_degree-1)*
+                         self.config["add_size_per_out_link"],
                          size_max) for x in self.G.nodes()]
 
         nx.draw(self.G, pos, node_size=node_size,  arrows=False,
-             with_labels=True, edge_color=self.config["edge_color"],
+             with_labels=self.config["show_labels"],
+             edge_color=self.config["edge_color"],
              font_size=12*self.config["style_scale"],
              node_color=col, vmin=0, vmax=self.depth, alpha=0.3, nodelist=[])
 
         nx.draw(self.G, pos, node_size=node_size,  arrows=False,
-             with_labels=True,
+             with_labels=self.config["show_labels"],
              font_size=12*self.config["style_scale"],
              node_color=col, vmin=0, vmax=self.depth, edgelist=[])
         print "Writing: {}".format(filename)
         plt.savefig(filename, dpi=75)
         plt.close()
-
 
 
     def _add_pos_to_nodes(self):
@@ -150,14 +155,11 @@ class Graph(object):
         #: scale on the diagram
         level_height = 10
 
-        # Time to integrate for
-        tmax = 30.0
-
         #: Maximum displacement of a point on a single iteration
         max_displacement = level_height * self.config["max_displacement"]
 
         #: The timestep to take on each iteration
-        dt = tmax/self.config["num_iterations"]
+        dt = self.config["tmax"]/self.config["num_iterations"]
 
         # Initialize x with a random position unless you're the top level
         # package, then set x=0
