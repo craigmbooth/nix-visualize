@@ -7,16 +7,14 @@ import random
 import shlex
 import subprocess
 import sys
+import tempfile
 
 import networkx as nx
 import pygraphviz as pgv
-import tempfile
-
-#import matplotlib
-#matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 import util
+from graph_objects import Node, Edge
 
 #: Default values for things we expect in the config file
 CONFIG_OPTIONS = {
@@ -29,67 +27,7 @@ CONFIG_OPTIONS = {
     "max_displacement": (2.5, float),
     "repulsive_force_normalization": (2.0, float),
     "attractive_force_normalization": (1.0, float)
-    }
-
-class Edge(object):
-    """Class represents the relationship between two packages."""
-
-    def __init__(self, node_from, node_to):
-        self.nfrom_raw=node_from
-        self.nto_raw=node_to
-        self.nfrom = util.remove_nix_hash(os.path.basename(self.nfrom_raw))
-        self.nto = util.remove_nix_hash(os.path.basename(self.nto_raw))
-
-    def __repr__(self):
-        return "{} -> {}".format(self.nfrom, self.nto)
-
-
-class Node(object):
-    """Class represents an individual package"""
-
-    def __init__(self, name):
-        self.raw_name = name
-        self.name = util.remove_nix_hash(self.raw_name)
-        self.children = []
-        self.parents = []
-        self.in_degree = 0
-        self.out_degree = 0
-        self.level = -1
-
-        self.x = 0
-        self.y = 0
-
-    def add_parent(self, nfrom, nto):
-        self.parents.append(nto)
-        self.out_degree = len(self.parents)
-
-    def add_child(self, nfrom, nto):
-        self.children.append(nfrom)
-        self.in_degree = len(self.children)
-
-    def add_level(self):
-        """Add the Node's level.  Level is this package's position in the
-        hierarchy.  0 is the top-level package.  That package's dependencies
-        are level 1, their dependencies are level 2.
-        """
-
-        if self.level >= 0:
-            return self.level
-        elif len(self.parents) > 0:
-            parent_levels =  [p.add_level() for p in self.parents]
-            self.level = max(parent_levels) + 1
-            return self.level
-        else:
-            self.level = 0
-            return 0
-
-    def __repr__(self):
-        return self.name
-        if not self.name.startswith("nodejs"):
-            return self.name.strip("-nodejs-4.6.0")
-        else:
-            return self.name
-
+}
 
 class Graph(object):
 
@@ -118,8 +56,6 @@ class Graph(object):
         for n in self.nodes:
             n.add_level()
 
-        # The depth of the tree is simply 1 + the maximum level since
-        # the root is level 0
         self.depth = max([x.level for x in self.nodes]) + 1
 
         # Transform the Nodes and Edges into a networkx graph
@@ -132,7 +68,7 @@ class Graph(object):
         self._add_pos_to_nodes()
 
         if do_write is True:
-            self.write_frame(filename=output_file)
+            self.write_frame_png(filename=output_file)
 
     def _parse_config(self, config, verbose=True):
 
@@ -163,7 +99,7 @@ class Graph(object):
 
         return return_configs
 
-    def write_frame(self, filename="frame.png"):
+    def write_frame_png(self, filename="frame.png"):
 
         pos = {n: (n.x, n.y) for n in self.nodes}
         col = [x.level for x in self.G.nodes()]
@@ -315,7 +251,7 @@ class Graph(object):
 
         for node in G.nodes():
             if (util.remove_nix_hash(node.name) not
-                    in [n.name for n in all_nodes]):
+                in [n.name for n in all_nodes]):
                 all_nodes.append(Node(node.name))
 
         for edge in G.edges():
