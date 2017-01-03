@@ -4,7 +4,23 @@ Script that automates the generation of pretty dependency graphs from the output
 
 ## Command Line Options
 
+After installation, the minimal way to run the CLI is
+
+    nix-visualize <path-to-nix-store-object>
+
+which will generate a graph of the dependency tree for the nix store object using sensible defaults for both appearance and graph layout.  In order to override settings, use a configuration file in .ini format.
+
+    usage: nix-visualize [-h] [--configfile CONFIGFILE]
+                         [--configsection CONFIGSECTION] [--output OUTPUT]
+                         <path-to-nix-store-object>
+
 ## Configuration Files
+
+If there is only a single section in the configuration file, it is only necessary to specify the ``--configfile`` option.  If the config file contains more than one section it is also necessary to specify ``--configsection``.
+
+### List of parameters
+
+TODO
 
 ## Graph Layout Algorithm
 
