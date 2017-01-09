@@ -56,8 +56,18 @@ class Node(object):
             return 0
 
     def __repr__(self):
-        return self.name
-        if not self.name.startswith("nodejs"):
-            return self.name.strip("-nodejs-4.6.0")
+        if self.name.endswith("-nodejs-4.6.0"):
+            return self.name.replace("-nodejs-4.6.0", "")
+        elif self.name.startswith("python3.4-"):
+            return self.name.replace("python3.4-", "")
         else:
             return self.name
+
+    def __hash__(self):
+        return hash((self.name,))
+
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self.name == other.name
+        else:
+            return False
