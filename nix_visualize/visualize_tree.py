@@ -10,11 +10,12 @@ import sys
 import tempfile
 import logging
 
-
 import networkx as nx
 import pygraphviz as pgv
 import matplotlib
 import matplotlib.pyplot as plt
+import warnings
+warnings.filterwarnings("ignore")
 
 import nix_visualize
 
@@ -47,31 +48,11 @@ CONFIG_OPTIONS = {
 }
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("packages",
-                        help="Full path to a package in the Nix store. "
-                        "This package will be diagrammed", nargs='+')
-    parser.add_argument("--configfile", "-c", help="ini file with layout and "
-                        "style configuration", required=False)
-    parser.add_argument("--configsection", "-s", help="section from ini file "
-                        "to read")
-    parser.add_argument("--output", "-o", help="output filename, will be "
-                        "a png", default="frame.png", required=False)
-    parser.add_argument('--verbose', dest='verbose', action='store_true')
-    parser.add_argument('--no-verbose', dest='verbose', action='store_false')
-    parser.set_defaults(verbose=False)
-    args = parser.parse_args()
-
-    init_logger(debug=args.verbose)
-
-    graph = Graph(args.packages, (args.configfile, args.configsection),
-                  args.output)
-
-
 class Graph(object):
+    """Class representing a dependency tree"""
 
     def __init__(self, packages, config, output_file, do_write=True):
+        """Initialize a graph from the result of a nix-store command"""
 
         self.config = self._parse_config(config)
 
@@ -84,12 +65,17 @@ class Graph(object):
         for package in packages:
             # Run nix-store -q --graph <package>.  This generates a graphviz
             # file with package dependencies
-            cmd = ("/nix/store/lzradzr5c38amahvqfra9g7rp8wfw2f0-nix-1.11.4/"
-                  "bin/nix-store -q --graph {}".format(package))
-            res = subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE)
-            raw_graph, _ = res.communicate()
+            cmd = ("/nix/store/lzradzr5c38amahvqfra9g7rp8wfw2f0-nix-1.11.4/bin/nix-store -q --graph {}".format(package))
+            res = subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE)
 
-            package_nodes, package_edges = self._get_edges_and_nodes(raw_graph)
+            stdout, stderr = res.communicate()
+
+            if res.returncode != 0:
+                raise util.TreeCLIError("nix-store call failed, message "
+                                        "{}".format(stderr))
+
+            package_nodes, package_edges = self._get_edges_and_nodes(stdout)
 
             self.nodes.extend(package_nodes)
             self.edges.extend(package_edges)
@@ -105,6 +91,9 @@ class Graph(object):
 
         self.depth = max([x.level for x in self.nodes]) + 1
 
+        logger.info("Graph has {} nodes, {} edges and a depth of {}".format(
+                    len(self.nodes), len(self.edges), self.depth))
+
         # Transform the Nodes and Edges into a networkx graph
         self.G = nx.DiGraph()
         for node in self.nodes:
@@ -117,6 +106,9 @@ class Graph(object):
             self.write_frame_png(filename=output_file)
 
     def _parse_config(self, config, verbose=True):
+        """Load visualization parameters from config file or take defaults
+        if they are not in there
+        """
 
         configfile = config[0]
         configsection = config[1]
@@ -129,12 +121,23 @@ class Graph(object):
             if len(configs.sections()) > 1:
                 if configsection is None:
                     raise util.TreeCLIError("Config file {} contains more than "
-                                       "one section, so -s must be set")
+                                       "one section, so -s must be set".format(
+                                           configfile))
+                elif configsection not in configs.sections():
+                    raise util.TreeCLIError("Config file {} does not contain a "
+                                            "section named {}".format(
+                                                configfile, configsection))
             else:
+                # There is only one section in the file, just read it
                 configsection = configs.sections()[0]
         else:
+            logger.info("--configfile not set, using all defaults")
             return {k: v[0] for k, v in CONFIG_OPTIONS.iteritems()}
 
+        logger.info("Reading section [{}] of file {}".format(configsection,
+                                                             configfile))
+        # Loop through config options.  If there is a corresponding key in the
+        # config file, overwrite, else take the value from the defaults
         for param, (p_default, p_dtype) in CONFIG_OPTIONS.iteritems():
             try:
                 return_configs[param] = p_dtype(
@@ -149,12 +152,13 @@ class Graph(object):
         return return_configs
 
     def write_frame_png(self, filename="frame.png"):
+        """Dump the graph to a png file"""
 
         pos = {n: (n.x, n.y) for n in self.nodes}
         col_scale = 255.0/(self.depth+1.0)
         col = [(x.level+random.random()*self.config["color_scatter"])*col_scale
                for x in self.G.nodes()]
-        col = [min([x,254]) for x in col]
+        col = [min([x,255]) for x in col]
 
         img_y_height=self.config["img_y_height_inches"]
 
@@ -172,18 +176,14 @@ class Graph(object):
         nx.draw(self.G, pos, node_size=node_size,  arrows=False,
              with_labels=self.config["show_labels"],
              edge_color=self.config["edge_color"],
-             font_size=12*self.config["font_scale"], cmap=plt.cm.autumn,
+             font_size=12*self.config["font_scale"],
              node_color=col, vmin=0, vmax=256,
              alpha=self.config["edge_alpha"], nodelist=[])
-
-        my_rgb = ["#7dc142", "#7dc142", "#FFAF03", "#FFFFFF"]
-        my_cmap = matplotlib.colors.LinearSegmentedColormap.from_list("my_cmap", my_rgb, N=255)
-        #my_cmap = matplotlib.colors.ListedColormap(my_rgb, name='my_name')
 
         # Draw nodes
         nx.draw(self.G, pos, node_size=node_size,  arrows=False,
              with_labels=self.config["show_labels"],
-             font_size=12*self.config["font_scale"], cmap=my_cmap,
+             font_size=12*self.config["font_scale"],
              node_color=col, vmin=0, vmax=255, edgelist=[],
              font_weight="light",
              font_color=self.config["font_color"])
@@ -191,7 +191,6 @@ class Graph(object):
         logger.info("Writing png file: {}".format(filename))
         plt.savefig(filename, dpi=self.config["dpi"])
         plt.close()
-
 
     def _add_pos_to_nodes(self):
         """Populates every node with an x an y position using the following
@@ -205,10 +204,11 @@ class Graph(object):
              the node and its neighbor
            * advance time forward by dt=tmax/num_iterations, displace particles
              by F*dt
-           * XXXXX
+           * repeat until the number of iterations has been exhausted
         """
 
         logger.info("Adding positions to nodes")
+
         #: The distance between levels in arbitrary units.  Used to set a
         #: scale on the diagram
         level_height = 10
@@ -223,18 +223,17 @@ class Graph(object):
 
         count_top_level = 0
         # Initialize x with a random position unless you're the top level
-        # package, then set x=0
+        # package, then space nodes evenly
         for n in self.nodes:
             if n.level == 0:
+                #TODO: FIX
                 n.x = 400 + 200.0 * float(count_top_level) / number_top_level
                 count_top_level += 1
                 n.y = self.depth * level_height
             else:
                 n.x = 1000*random.random()
 
-        iframe = 0
         for iternum in range(self.config["num_iterations"]):
-
             if iternum in range(0,self.config["num_iterations"],
                                 int(self.config["num_iterations"]/10)):
                 logger.debug("Completed iteration {} of {}".format(iternum,
@@ -287,7 +286,6 @@ class Graph(object):
                     total_abs_displacement += (abs(lev_node.dx_parent * dt) +
                                                abs(lev_node.dx_sibling * dt))
 
-
     def level(self, level):
         """Return a list of all nodes on a given level
         """
@@ -302,7 +300,6 @@ class Graph(object):
         """Return a list of all nodes whose names begin with a given prefix
         """
         return [x for x in self.nodes if x.name.startswith(name)]
-
 
     def _get_edges_and_nodes(self, raw_lines):
         """Transform a raw GraphViz file into Node and Edge objects.  Note
@@ -354,14 +351,11 @@ class Graph(object):
         return ret_str
 
 
-
 def init_logger(debug=False):
     """Sets up logging for this cli"""
     log_level = logging.DEBUG if debug else logging.INFO
-
     logging.basicConfig(format="%(levelname)s %(message)s\033[1;0m",
                         stream=sys.stderr, level=log_level)
-
     logging.addLevelName(logging.CRITICAL,
                          "\033[1;37m[\033[1;31mCRIT\033[1;37m]\033[0;31m")
     logging.addLevelName(logging.ERROR,
@@ -372,6 +366,33 @@ def init_logger(debug=False):
                          "\033[1;37m[\033[1;32mINFO\033[1;37m]\033[0;37m")
     logging.addLevelName(logging.DEBUG,
                          "\033[1;37m[\033[1;34mDBUG\033[1;37m]\033[0;34m")
+
+
+def main():
+    """Parse command line arguments, instantiate graph and dump image"""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("packages",
+                        help="Full path to a package in the Nix store. "
+                        "This package will be diagrammed", nargs='+')
+    parser.add_argument("--configfile", "-c", help="ini file with layout and "
+                        "style configuration", required=False)
+    parser.add_argument("--configsection", "-s", help="section from ini file "
+                        "to read")
+    parser.add_argument("--output", "-o", help="output filename, will be "
+                        "a png", default="frame.png", required=False)
+    parser.add_argument('--verbose', dest='verbose', action='store_true')
+    parser.add_argument('--no-verbose', dest='verbose', action='store_false')
+    parser.set_defaults(verbose=False)
+    args = parser.parse_args()
+
+    init_logger(debug=args.verbose)
+
+    try:
+        graph = Graph(args.packages, (args.configfile, args.configsection),
+                  args.output)
+    except util.TreeCLIError, e:
+        sys.stderr.write(e.message+"\n")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

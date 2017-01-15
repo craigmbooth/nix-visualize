@@ -56,14 +56,10 @@ class Node(object):
             return 0
 
     def __repr__(self):
-        if self.name.endswith("-nodejs-4.6.0"):
-            return self.name.replace("-nodejs-4.6.0", "")
-        elif self.name.startswith("python3.4-"):
-            return self.name.replace("python3.4-", "")
-        else:
             return self.name
 
     def __hash__(self):
+        """A package is uniquely identified by its name"""
         return hash((self.name,))
 
     def __eq__(self, other):
