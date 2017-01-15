@@ -39,16 +39,24 @@ class Node(object):
         self.children.append(nfrom)
         self.in_degree = len(self.children)
 
-    def add_level(self):
+    def add_level(self, debug=False):
         """Add the Node's level.  Level is this package's position in the
         hierarchy.  0 is the top-level package.  That package's dependencies
         are level 1, their dependencies are level 2.
         """
 
+
         if self.level >= 0:
+            if debug is True:
+                print "Found that {} as level {}".format(self.name, self.level)
             return self.level
+
         elif len(self.parents) > 0:
-            parent_levels =  [p.add_level() for p in self.parents]
+            if debug is True:
+                print "Adding level to {}, with parents: {}".format(
+                    self.name, self.parents)
+
+            parent_levels =  [p.add_level(debug=debug) for p in self.parents]
             self.level = max(parent_levels) + 1
             return self.level
         else:
@@ -56,12 +64,21 @@ class Node(object):
             return 0
 
     def __repr__(self):
-        if self.name.endswith("-nodejs-4.6.0"):
-            return self.name.replace("-nodejs-4.6.0", "")
-        elif self.name.startswith("python3.4-"):
-            return self.name.replace("python3.4-", "")
+
+        n = self.name
+        if n.startswith("narrativescience-"):
+            n = n.lstrip("narrativescience-")
+
+        if self.name == "python3.4-ns_python_runtime-0.0.561":
+            return "Quill 3 Python Container"
+        elif self.name == "narrativescience-quill3-singlejs-0.0.0-nodejs-4.6.0":
+            return "Quill 3 Node.js Container"
+        elif n.endswith("-nodejs-4.6.0"):
+            return n.replace("-nodejs-4.6.0", "")
+        elif n.startswith("python3.4-"):
+            return n.replace("python3.4-", "")
         else:
-            return self.name
+            return n
 
     def __hash__(self):
         return hash((self.name,))

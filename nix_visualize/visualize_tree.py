@@ -10,7 +10,6 @@ import sys
 import tempfile
 import logging
 
-
 import networkx as nx
 import pygraphviz as pgv
 import matplotlib
@@ -88,11 +87,18 @@ class Graph(object):
                   "bin/nix-store -q --graph {}".format(package))
             res = subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE)
             raw_graph, _ = res.communicate()
+            #with open("quill2_full_graph.txt", "r") as f:
+            #    raw_graph = "\n".join(f.readlines())
 
             package_nodes, package_edges = self._get_edges_and_nodes(raw_graph)
 
             self.nodes.extend(package_nodes)
             self.edges.extend(package_edges)
+
+        # Quill 3 specific
+        #self.nodes.append(Node("-Quill 3"))
+        #self.edges.append(Edge("/nix/store/37wkwnf21ym46w9w5iab06ykpisdlvix-python3.4-ns_python_runtime-0.0.561", "-Quill 3"))
+        #self.edges.append(Edge("/nix/store/bkdyhizkfvnag0ggvn1q48nr0p5sll1b-narrativescience-quill3-singlejs-0.0.0-nodejs-4.6.0", "-Quill 3"))
 
         self.nodes = list(set(self.nodes))
 
@@ -101,9 +107,13 @@ class Graph(object):
         # The package itself is level 0, its direct dependencies are
         # level 1, their direct dependencies are level 2, etc.
         for n in self.nodes:
-            n.add_level()
+            logger.debug("Adding level to: {}".format(n.name))
+            n.add_level(debug=n.name.startswith("postgresql-"))
 
         self.depth = max([x.level for x in self.nodes]) + 1
+
+        logger.info("Graph has {} nodes, {} edges and a depth of {}".format(
+            len(self.nodes), len(self.edges), self.depth))
 
         # Transform the Nodes and Edges into a networkx graph
         self.G = nx.DiGraph()
@@ -120,6 +130,8 @@ class Graph(object):
 
         configfile = config[0]
         configsection = config[1]
+        logger.debug("Reading config file: {}:{}".format(configfile,
+                                                         configsection))
 
         return_configs = {}
 
@@ -131,8 +143,11 @@ class Graph(object):
                     raise util.TreeCLIError("Config file {} contains more than "
                                        "one section, so -s must be set")
             else:
+                # If there's only one section, just assume that's the one
                 configsection = configs.sections()[0]
         else:
+            # If configfile is None, splat the contents of the CONFIG_OPTIONS
+            # dictionary into the configuration
             return {k: v[0] for k, v in CONFIG_OPTIONS.iteritems()}
 
         for param, (p_default, p_dtype) in CONFIG_OPTIONS.iteritems():
@@ -152,9 +167,6 @@ class Graph(object):
 
         pos = {n: (n.x, n.y) for n in self.nodes}
         col_scale = 255.0/(self.depth+1.0)
-        col = [(x.level+random.random()*self.config["color_scatter"])*col_scale
-               for x in self.G.nodes()]
-        col = [min([x,254]) for x in col]
 
         img_y_height=self.config["img_y_height_inches"]
 
@@ -163,30 +175,65 @@ class Graph(object):
 
         plt.figure(1, figsize=(img_y_height*self.config["aspect_ratio"],
                                img_y_height))
-        node_size = [min(size_min + (x.out_degree-1)*
-                         self.config["add_size_per_out_link"],
-                         size_max) if x.level > 0 else size_max for
-                     x in self.G.nodes()]
 
         # Draw edges
-        nx.draw(self.G, pos, node_size=node_size,  arrows=False,
-             with_labels=self.config["show_labels"],
+
+
+
+        nx.draw(self.G, pos,  arrows=False,
+             with_labels=False,
              edge_color=self.config["edge_color"],
              font_size=12*self.config["font_scale"], cmap=plt.cm.autumn,
-             node_color=col, vmin=0, vmax=256,
+             vmin=0, vmax=256,
              alpha=self.config["edge_alpha"], nodelist=[])
 
         my_rgb = ["#7dc142", "#7dc142", "#FFAF03", "#FFFFFF"]
         my_cmap = matplotlib.colors.LinearSegmentedColormap.from_list("my_cmap", my_rgb, N=255)
-        #my_cmap = matplotlib.colors.ListedColormap(my_rgb, name='my_name')
 
         # Draw nodes
-        nx.draw(self.G, pos, node_size=node_size,  arrows=False,
+        draw_nodes = [x for x in self.G.nodes() if x.level > 0]
+        col = [(x.level+random.random()*self.config["color_scatter"])*col_scale
+               for x in self.G.nodes() if x.level > 0]
+        col = [min([x,245]) for x in col]
+        node_size = [min(size_min + (x.out_degree-1)*
+                         self.config["add_size_per_out_link"],
+                         size_max) if x.level > 0 else size_max*1.5 for
+                     x in self.G.nodes() if x.level > 0]
+
+        nx.draw_networkx_nodes(self.G, pos, node_size=node_size,  arrows=False,
              with_labels=self.config["show_labels"],
              font_size=12*self.config["font_scale"], cmap=my_cmap,
-             node_color=col, vmin=0, vmax=255, edgelist=[],
+             node_color=col, vmin=0, vmax=255, edgelist=[], nodelist=draw_nodes,
              font_weight="light",
              font_color=self.config["font_color"])
+
+        labels = dict((n, n) for n in self.G.nodes() if n.level == 0)
+        nx.draw_networkx_labels(self.G, pos,
+                                font_size=1.5*12*self.config["font_scale"], nodelist=draw_nodes,
+                                font_weight="light", font_color=self.config["font_color"],
+                                labels=labels)
+
+        draw_nodes = [x for x in self.G.nodes() if x.level == 0]
+        col = [(x.level+random.random()*self.config["color_scatter"])*col_scale
+               for x in self.G.nodes() if x.level == 0]
+        col = [min([x,245]) for x in col]
+        node_size = [min(size_min + (x.out_degree-1)*
+                         self.config["add_size_per_out_link"],
+                         size_max) if x.level > 0 else size_max*1.5 for
+                     x in self.G.nodes() if x.level == 0]
+
+        nx.draw_networkx_nodes(self.G, pos, node_size=node_size,  arrows=False,
+             with_labels=self.config["show_labels"],
+             font_size=12*self.config["font_scale"]*1.5, cmap=my_cmap,
+             node_color=col, vmin=0, vmax=255, edgelist=[], nodelist=draw_nodes,
+             font_weight="light",
+             font_color=self.config["font_color"])
+
+        labels = dict((n, n) for n in self.G.nodes() if n.level > 0)
+        nx.draw_networkx_labels(self.G, pos,
+                                font_size=12*self.config["font_scale"], nodelist=draw_nodes,
+                                font_weight="light", font_color=self.config["font_color"],
+                                labels=labels)
 
         logger.info("Writing png file: {}".format(filename))
         plt.savefig(filename, dpi=self.config["dpi"])
@@ -227,10 +274,14 @@ class Graph(object):
         for n in self.nodes:
             if n.level == 0:
                 n.x = 400 + 200.0 * float(count_top_level) / number_top_level
-                count_top_level += 1
                 n.y = self.depth * level_height
+                count_top_level += 1
             else:
                 n.x = 1000*random.random()
+                if "node" in n.name:
+                    n.x -= 1000
+                elif "python" in n.name:
+                    n.x -= 1000
 
         iframe = 0
         for iternum in range(self.config["num_iterations"]):
@@ -242,20 +293,6 @@ class Graph(object):
             total_abs_displacement = 0.0
 
             for level in range(1, self.depth):
-
-                # Get the y-offset by cycling with other nodes in the
-                # same level
-                xpos = [(x.name, x.x) for x in self.level(level)]
-                xpos = sorted(xpos, key=lambda x:x[1])
-                xpos = zip(xpos,
-                           itertools.cycle(range(self.config["y_sublevels"])))
-                pos_sorter = {x[0][0]: x[1] for x in xpos}
-
-                for n in self.level(level):
-                    n.y = ((self.depth - n.level) * level_height +
-                           pos_sorter[n.name] *
-                           self.config["y_sublevel_spacing"]*level_height)
-
 
                 for lev_node in self.level(level):
                     # We pull nodes toward their parents
@@ -286,6 +323,25 @@ class Graph(object):
                     lev_node.x += lev_node.dx_sibling * dt
                     total_abs_displacement += (abs(lev_node.dx_parent * dt) +
                                                abs(lev_node.dx_sibling * dt))
+
+
+                # Get the y-offset by cycling with other nodes in the
+                # same level
+                xpos = [(x.name, x.x) for x in self.level(level)]
+                xpos = sorted(xpos, key=lambda x:x[1])
+
+                if level == 1:
+                    xpos = zip(xpos,
+                           itertools.cycle(range(self.config["y_sublevels"]-4)))
+                else:
+                    xpos = zip(xpos,
+                           itertools.cycle(range(self.config["y_sublevels"])))
+                pos_sorter = {x[0][0]: x[1] for x in xpos}
+
+                for n in self.level(level):
+                    n.y = ((self.depth - n.level) * level_height +
+                           pos_sorter[n.name] *
+                           self.config["y_sublevel_spacing"]*level_height)
 
 
     def level(self, level):
@@ -333,14 +389,22 @@ class Graph(object):
         """
 
         for edge in self.edges:
-            nfrom = [n for n in self.nodes if n.name == edge.nfrom]
-            nto = [n for n in self.nodes if n.name == edge.nto]
-            nfrom = nfrom[0]
-            nto = nto[0]
-            if nto not in nfrom.parents:
-                nfrom.add_parent(nfrom, nto)
-            if nfrom not in nto.children:
-                nto.add_child(nfrom, nto)
+            try:
+                nfrom = [n for n in self.nodes if n.name == edge.nfrom]
+                nto = [n for n in self.nodes if n.name == edge.nto]
+                nfrom = nfrom[0]
+                nto = nto[0]
+                if nfrom.name == nto.name:
+                    print "Self link", nfrom.name
+                    continue
+
+                if nto not in nfrom.parents:
+                    nfrom.add_parent(nfrom, nto)
+                if nfrom not in nto.children:
+                    nto.add_child(nfrom, nto)
+            except:
+                import pdb; pdb.set_trace()
+
 
     def __repr__(self):
         """Basic print of Graph, show the package name and the number of
