@@ -1,3 +1,0 @@
-matplotlib>=1.5
-networkx>=1.11
-pygraphviz>=1.3

@@ -15,7 +15,11 @@ setuptools.setup(
     download_url = "https://github.com/craigmbooth/nix-dependency-visualizer/tarball/"+VERSION,
     keywords=["nix", "matplotlib"],
     classifiers=[],
-    install_requires=open("requirements.txt").readlines(),
+    install_requires=[
+        "matplotlib>=1.5",
+        "networkx>=1.11",
+        "pygraphviz>=1.3"
+    ],
     data_files = [],
     entry_points={"console_scripts": [
         "nix-visualize=nix_visualize.visualize_tree:main"
