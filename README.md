@@ -14,13 +14,15 @@ And the right-hand image was generated with
 
     nix-visualize /nix/store/<hash>-python3.4-SQLAlchemy-1.0.15 /nix/store/<hash>-knex-0.8.6-nodejs-4.6.0 --configfile config.cfg --configsection dbs --verbose
 
+The configuration parameters to generate both of these images are provided in [config.cfg](config.cfg)
+
 ## Installation
 
-To manually install, you can download this repo and
+To manually install, you can download this repo and issue the command
 
     python setup.py install
 
-Or, the package is available on PyPI under the name `nix-visualize`, so
+Or, the package is available [on PyPI](https://pypi.python.org/pypi/nix_visualize/) under the name `nix-visualize`, so it can be pip installed
 
     pip install nix-visualize
 
