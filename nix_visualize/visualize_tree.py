@@ -67,7 +67,7 @@ class Graph(object):
         for package in packages:
             # Run nix-store -q --graph <package>.  This generates a graphviz
             # file with package dependencies
-            cmd = ("/nix/store/lzradzr5c38amahvqfra9g7rp8wfw2f0-nix-1.11.4/bin/nix-store -q --graph {}".format(package))
+            cmd = ("nix-store -q --graph {}".format(package))
             res = subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
 
