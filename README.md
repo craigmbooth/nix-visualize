@@ -6,6 +6,11 @@ Script that automates the generation of pretty dependency graphs from the output
 
 <img src="images/nix.png" width="33%"><img src="images/dbs.png" width="66%">
 
+The above graphs show the dependency tree for Nix (left) and for both (http://www.sqlalchemy.org/)[SQLAlchemy] and knex (right image)
+
+    nix-visualize /nix/store/<hash>-nix-1.11.4 --configfile config.cfg --configsection nix --verbose
+
+    nix-visualize /nix/store/<hash>-python3.4-SQLAlchemy-1.0.15 /nix/store/<hash>-knex-0.8.6-nodejs-4.6.0 --configfile config.cfg --configsection dbs --verbose
 ## Command Line Options
 
 After installation, the minimal way to run the CLI is
