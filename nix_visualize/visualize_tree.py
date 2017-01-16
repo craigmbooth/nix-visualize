@@ -32,12 +32,14 @@ CONFIG_OPTIONS = {
     "color_scatter": (1.0, float),
     "edge_color": ("#888888", str),
     "font_color": ("#888888", str),
+    "color_map": ("rainbow", str),
     "img_y_height_inches": (24, float),
     "y_sublevels": (5, int),
     "y_sublevel_spacing": (0.2, float),
     "num_iterations": (100, int),
     "edge_alpha": (0.3, float),
     "max_displacement": (2.5, float),
+    "top_level_spacing": (100, float),
     "repulsive_force_normalization": (2.0, float),
     "attractive_force_normalization": (1.0, float),
     "add_size_per_out_link": (200, int),
@@ -154,6 +156,12 @@ class Graph(object):
     def write_frame_png(self, filename="frame.png"):
         """Dump the graph to a png file"""
 
+        try:
+            cmap = getattr(matplotlib.cm, self.config["color_map"])
+        except AttributeError:
+            raise util.TreeCLIError("Colormap {} does not exist".format(
+                self.config["color_map"]))
+
         pos = {n: (n.x, n.y) for n in self.nodes}
         col_scale = 255.0/(self.depth+1.0)
         col = [(x.level+random.random()*self.config["color_scatter"])*col_scale
@@ -185,7 +193,7 @@ class Graph(object):
              with_labels=self.config["show_labels"],
              font_size=12*self.config["font_scale"],
              node_color=col, vmin=0, vmax=255, edgelist=[],
-             font_weight="light",
+             font_weight="light", cmap=cmap,
              font_color=self.config["font_color"])
 
         logger.info("Writing png file: {}".format(filename))
@@ -226,12 +234,12 @@ class Graph(object):
         # package, then space nodes evenly
         for n in self.nodes:
             if n.level == 0:
-                #TODO: FIX
-                n.x = 400 + 200.0 * float(count_top_level) / number_top_level
+                n.x = float(count_top_level)*self.config["top_level_spacing"]
                 count_top_level += 1
                 n.y = self.depth * level_height
             else:
-                n.x = 1000*random.random()
+                n.x = ((number_top_level + 1) *
+                       self.config["top_level_spacing"] * random.random())
 
         for iternum in range(self.config["num_iterations"]):
             if iternum in range(0,self.config["num_iterations"],
@@ -334,6 +342,11 @@ class Graph(object):
             nto = [n for n in self.nodes if n.name == edge.nto]
             nfrom = nfrom[0]
             nto = nto[0]
+
+            if nfrom.name == nto.name:
+                # Disallow self-references
+                continue
+
             if nto not in nfrom.parents:
                 nfrom.add_parent(nfrom, nto)
             if nfrom not in nto.children:
@@ -391,7 +404,7 @@ def main():
         graph = Graph(args.packages, (args.configfile, args.configsection),
                   args.output)
     except util.TreeCLIError, e:
-        sys.stderr.write(e.message+"\n")
+        sys.stderr.write("ERROR: {}\n".format(e.message))
         sys.exit(1)
 
 
