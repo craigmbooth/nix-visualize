@@ -11,6 +11,5 @@ pythonPackages.buildPythonPackage rec {
     matplotlib
     networkx
     pygraphviz
-    tkinter
   ];
 }
