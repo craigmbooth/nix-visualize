@@ -5,7 +5,7 @@
 
 pythonPackages.buildPythonPackage rec {
   name = "nix-visualize-${version}";
-  version = "1.0.3";
+  version = "1.0.4";
   src = ./.;
   propagatedBuildInputs = with pythonPackages; [
     matplotlib
