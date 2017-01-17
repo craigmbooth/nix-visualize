@@ -5,16 +5,21 @@ Script that automates the generation of pretty dependency graphs from the output
 ## Example Images
 
 <img src="images/nix.png" width="33%"><img src="images/dbs.png" width="66%">
+<img src="images/git.png" width="100%">
 
-The above graphs show the dependency tree for Nix (left) and for both [SQLAlchemy](http://www.sqlalchemy.org/) and [knex](http://knexjs.org/) (right image).  The Nix dependency tree was generated with the following command
+The above graphs show the dependency tree for Nix (top-left), for both [SQLAlchemy](http://www.sqlalchemy.org/) and [knex](http://knexjs.org/) (top-right image), and for Git (bottom).  The Nix dependency tree was generated with the following command
 
-    nix-visualize /nix/store/<hash>-nix-1.11.4 --configfile config.cfg --configsection nix --verbose
+    nix-visualize /nix/store/<hash>-nix-1.11.4 -c config.cfg -s nix -o nix.png
 
-And the right-hand image was generated with
+the database image was generated with
 
-    nix-visualize /nix/store/<hash>-python3.4-SQLAlchemy-1.0.15 /nix/store/<hash>-knex-0.8.6-nodejs-4.6.0 --configfile config.cfg --configsection dbs --verbose
+    nix-visualize /nix/store/<hash>-python3.4-SQLAlchemy-1.0.15 /nix/store/<hash>-knex-0.8.6-nodejs-4.6.0 -c config.cfg -s dbs -o dbs.png
 
-The configuration parameters to generate both of these images are provided in [config.cfg](config.cfg)
+and the git image was generated with
+
+    nix-visualize /nix/store/<hash>-git-2.10.1 -c config.cfg -s git -o git.png
+
+The configuration parameters to generate all of these images are provided in [config.cfg](config.cfg)
 
 ## Installation
 
@@ -56,9 +61,9 @@ which will generate a graph of the dependency tree for the nix store object usin
 The command line options have the following meanings:
 
    * `packages`: Add any number of positional arguments, specifying full paths to nix store objects.  This packages will be graphed.
-   * `--configfile`:  A configuration file in .ini format
-   * `--configsection`: If the configuration file contains more than one section, you must specify this option
-   * `--output`: The name of the png file to output (defaults to nix-tree.png)
+   * `--configfile`, or `-c`:  A configuration file in .ini format
+   * `--configsection`, or `-s`: If the configuration file contains more than one section, you must specify this option
+   * `--output`, or `-o`: The name of the png file to output (defaults to nix-tree.png)
    * `--verbose`: If this flag is present then print extra information to stdout.
 
 ## Configuration Files
@@ -77,6 +82,7 @@ There
    * `edge_color [default #888888]`: Hex code for color of lines linking nodes
    * `font_color [default #888888]`: Hex code for color of font labeling nodes
    * `edge_alpha [default 0.3]`: Opacity of edges. 1.0 is fully opaque, 0.0 is transparent
+   * `edge_width_scale [default 1.0]`:  Factor by which to scale the width of the edges
    * `show_labels [default 1]`: If this is 0 then hide labels
    * `y_sublevels [default 5]`: Number of discrete y-levels to use, see section on vertical positioning
    * `y_sublevel_spacing [default 0.2]`: Spacing between sublevels in units of the inter-level spacing.  Typically you should avoid having y_sublevels\*y_sublevel_spacing be greater than 1

@@ -39,6 +39,7 @@ CONFIG_OPTIONS = {
     "y_sublevel_spacing": (0.2, float),
     "num_iterations": (100, int),
     "edge_alpha": (0.3, float),
+    "edge_width_scale": (1.0, float),
     "max_displacement": (2.5, float),
     "top_level_spacing": (100, float),
     "repulsive_force_normalization": (2.0, float),
@@ -154,7 +155,7 @@ class Graph(object):
 
         return return_configs
 
-    def write_frame_png(self, filename="frame.png"):
+    def write_frame_png(self, filename="nix-tree.png"):
         """Dump the graph to a png file"""
 
         try:
@@ -187,6 +188,7 @@ class Graph(object):
              edge_color=self.config["edge_color"],
              font_size=12*self.config["font_scale"],
              node_color=col, vmin=0, vmax=256,
+             width=self.config["edge_width_scale"],
              alpha=self.config["edge_alpha"], nodelist=[])
 
         # Draw nodes
