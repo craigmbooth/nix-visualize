@@ -18,7 +18,21 @@ The configuration parameters to generate both of these images are provided in [c
 
 ## Installation
 
-To manually install, you can download this repo and issue the command
+## Nix Installation (preferred)
+
+The file [default.nix](default.nix) in the root of this directory contains the definition for `nix-visualize`.
+
+### Non-Nix Installation
+
+Install the prerequisites for the package.  On Linux based distributions:
+
+   * `graphviz`
+   * `graphviz-devel` (on CentOS, or `graphviz-dev` on Debian based distros)
+   * `gcc`
+   * `python-devel` (on CentOS, or `pyhon-dev` on Debian based distros)
+   * `tkinter` and `tk-devel`
+
+You can then either download this repo and issue the command
 
     python setup.py install
 

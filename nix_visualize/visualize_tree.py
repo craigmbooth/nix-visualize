@@ -13,6 +13,7 @@ import logging
 import networkx as nx
 import pygraphviz as pgv
 import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings("ignore")
