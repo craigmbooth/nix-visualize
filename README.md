@@ -120,3 +120,7 @@ Initially the horizontal positions for packages are chosen randomly, but the str
 2. A package should try not to be too close to another package on the same level, so as not to have nodes overlap.
 
 <img src="images/horizontal.png" align="middle">
+
+## Credits
+
+This software was written at 37,000 feet.  Thank you to American Airlines for putting me on a janky old plane for a 9 hour flight with no television.
