@@ -27,6 +27,8 @@ The configuration parameters to generate all of these images are provided in [co
 
 The file [default.nix](default.nix) in the root of this directory contains the definition for `nix-visualize`.
 
+So, for example, you could [download the zip file of this repo](https://github.com/craigmbooth/nix-visualize/archive/master.zip) and then unpack it, cd into it and run `nix-build ./default.nix`, after which `./result/bin/nix-visualize` is available.
+
 ### Non-Nix Installation
 
 Install the prerequisites for the package.  On Linux based distributions:
