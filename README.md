@@ -1,4 +1,6 @@
 # Nix Dependency Visualizer
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fcraigmbooth%2Fnix-visualize.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fcraigmbooth%2Fnix-visualize?ref=badge_shield)
+
 
 Script that automates the generation of pretty dependency graphs from the output of ``nix-store -q --graph <package>``.
 
@@ -126,3 +128,7 @@ Initially the horizontal positions for packages are chosen randomly, but the str
 ## Credits
 
 This software was written at 37,000 feet.  Thank you to American Airlines for putting me on a janky old plane for a 9 hour flight with no television.
+
+
+## License
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fcraigmbooth%2Fnix-visualize.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fcraigmbooth%2Fnix-visualize?ref=badge_large)
