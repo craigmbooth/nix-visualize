@@ -1,7 +1,7 @@
 """Definitions for edges and nodes for Nix dependency visualizer"""
 
 import os
-import util
+from . import util
 
 class Edge(object):
     """Class represents the relationship between two packages."""

@@ -1,6 +1,6 @@
 {
   pkgs ? import <nixpkgs> {},
-  pythonPackages ? pkgs.python2Packages
+  pythonPackages ? pkgs.python3Packages
 }:
 
 pythonPackages.buildPythonPackage rec {

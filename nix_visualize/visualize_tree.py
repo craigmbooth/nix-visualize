@@ -1,6 +1,6 @@
 """Script that visualizes dependencies of Nix packages"""
 import argparse
-import ConfigParser
+import configparser
 import itertools
 import os
 import random
@@ -18,10 +18,9 @@ import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings("ignore")
 
-import nix_visualize
 
-import util
-from graph_objects import Node, Edge
+from . import util
+from .graph_objects import Node, Edge
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +119,7 @@ class Graph(object):
         return_configs = {}
 
         if configfile is not None:
-            configs = ConfigParser.ConfigParser()
+            configs = configparser.ConfigParser()
             configs.read(configfile)
             if len(configs.sections()) > 1:
                 if configsection is None:
@@ -136,13 +135,13 @@ class Graph(object):
                 configsection = configs.sections()[0]
         else:
             logger.info("--configfile not set, using all defaults")
-            return {k: v[0] for k, v in CONFIG_OPTIONS.iteritems()}
+            return {k: v[0] for k, v in CONFIG_OPTIONS.items()}
 
         logger.info("Reading section [{}] of file {}".format(configsection,
                                                              configfile))
         # Loop through config options.  If there is a corresponding key in the
         # config file, overwrite, else take the value from the defaults
-        for param, (p_default, p_dtype) in CONFIG_OPTIONS.iteritems():
+        for param, (p_default, p_dtype) in CONFIG_OPTIONS.items():
             try:
                 return_configs[param] = p_dtype(
                     configs.get(configsection, param))
@@ -406,7 +405,7 @@ def main():
     try:
         graph = Graph(args.packages, (args.configfile, args.configsection),
                   args.output)
-    except util.TreeCLIError, e:
+    except util.TreeCLIError as e:
         sys.stderr.write("ERROR: {}\n".format(e.message))
         sys.exit(1)
 
