@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 """Script that visualizes dependencies of Nix packages"""
 import argparse
 import configparser
@@ -9,7 +11,9 @@ import subprocess
 import sys
 import tempfile
 import logging
+import csv
 
+import pandas as pd
 import networkx as nx
 import pygraphviz as pgv
 import matplotlib
@@ -50,6 +54,10 @@ CONFIG_OPTIONS = {
     "show_labels": (1, int)
 }
 
+def _is_csv_out(filename):
+    _fname, extension = os.path.splitext(filename)
+    fileformat = extension[1:]
+    return bool(fileformat == "csv")
 
 class Graph(object):
     """Class representing a dependency tree"""
@@ -57,13 +65,16 @@ class Graph(object):
     def __init__(self, packages, config, output_file, do_write=True):
         """Initialize a graph from the result of a nix-store command"""
 
-        self.config = self._parse_config(config)
+        csv_out = _is_csv_out(output_file)
+        if csv_out:
+            logger.info("CSV output: skip parsing visualization config file")
+        else:
+            self.config = self._parse_config(config)
 
         self.nodes = []
         self.edges = []
 
-        self.root_package_names = [util.remove_nix_hash(os.path.basename(x)) for
-                                   x in packages]
+        self.root_package_names = [os.path.basename(x) for x in packages]
 
         for package in packages:
             # Run nix-store -q --graph <package>.  This generates a graphviz
@@ -104,9 +115,24 @@ class Graph(object):
             for parent in node.parents:
                 self.G.add_edge(node, parent)
 
-        self._add_pos_to_nodes()
-        if do_write is True:
-            self.write_frame_png(filename=output_file)
+        if csv_out:
+            self._output_csv(output_file)
+        else:
+            self._add_pos_to_nodes()
+            if do_write is True:
+                self.write_frame_image(filename=output_file)
+
+    def _output_csv(self, filename):
+        df = pd.DataFrame.from_records([node.to_dict() for node in self.nodes])
+        df.sort_values(by=["level"], ascending=False, inplace=True)
+        df.to_csv(
+            path_or_buf=filename,
+            quoting=csv.QUOTE_ALL,
+            sep=",",
+            index=False,
+            encoding="utf-8"
+        )
+        logger.info("Wrote: %s", filename)
 
     def _parse_config(self, config, verbose=True):
         """Load visualization parameters from config file or take defaults
@@ -147,15 +173,15 @@ class Graph(object):
                     configs.get(configsection, param))
                 logger.debug("Setting {} to {}".format(param,
                                                        return_configs[param]))
-            except (ConfigParser.NoOptionError, ValueError):
+            except (configparser.NoOptionError, ValueError):
                 return_configs[param] = p_dtype(p_default)
                 logger.info( "Adding default of {} for {}".format(
                     p_dtype(p_default), param))
 
         return return_configs
 
-    def write_frame_png(self, filename="nix-tree.png"):
-        """Dump the graph to a png file"""
+    def write_frame_image(self, filename="nix-tree.png"):
+        """Dump the graph to an image file"""
 
         try:
             cmap = getattr(matplotlib.cm, self.config["color_map"])
@@ -198,7 +224,7 @@ class Graph(object):
              font_weight="light", cmap=cmap,
              font_color=self.config["font_color"])
 
-        logger.info("Writing png file: {}".format(filename))
+        logger.info("Writing image file: {}".format(filename))
         plt.savefig(filename, dpi=self.config["dpi"])
         plt.close()
 
@@ -254,7 +280,7 @@ class Graph(object):
 
                 # Get the y-offset by cycling with other nodes in the
                 # same level
-                xpos = [(x.name, x.x) for x in self.level(level)]
+                xpos = [(x.raw_name, x.x) for x in self.level(level)]
                 xpos = sorted(xpos, key=lambda x:x[1])
                 xpos = zip(xpos,
                            itertools.cycle(range(self.config["y_sublevels"])))
@@ -262,7 +288,7 @@ class Graph(object):
 
                 for n in self.level(level):
                     n.y = ((self.depth - n.level) * level_height +
-                           pos_sorter[n.name] *
+                           pos_sorter[n.raw_name] *
                            self.config["y_sublevel_spacing"]*level_height)
 
 
@@ -306,11 +332,6 @@ class Graph(object):
         for i in range(min_level,self.depth):
             yield self.level(i)
 
-    def nodes_by_prefix(self, name):
-        """Return a list of all nodes whose names begin with a given prefix
-        """
-        return [x for x in self.nodes if x.name.startswith(name)]
-
     def _get_edges_and_nodes(self, raw_lines):
         """Transform a raw GraphViz file into Node and Edge objects.  Note
         that at this point the nodes and edges are not linked into a graph
@@ -325,8 +346,7 @@ class Graph(object):
         all_nodes = []
 
         for node in G.nodes():
-            if (util.remove_nix_hash(node.name) not
-                in [n.name for n in all_nodes]):
+            if (node.name not in [n.raw_name for n in all_nodes]):
                 all_nodes.append(Node(node.name))
 
         for edge in G.edges():
@@ -340,12 +360,12 @@ class Graph(object):
         """
 
         for edge in self.edges:
-            nfrom = [n for n in self.nodes if n.name == edge.nfrom]
-            nto = [n for n in self.nodes if n.name == edge.nto]
+            nfrom = [n for n in self.nodes if n.raw_name == edge.nfrom]
+            nto = [n for n in self.nodes if n.raw_name == edge.nto]
             nfrom = nfrom[0]
             nto = nto[0]
 
-            if nfrom.name == nto.name:
+            if nfrom.raw_name == nto.raw_name:
                 # Disallow self-references
                 continue
 
@@ -359,7 +379,7 @@ class Graph(object):
         dependencies on each level
         """
         head = self.level(0)
-        ret_str = "Graph of package: {}".format(head[0].name)
+        ret_str = "Graph of package: {}".format(head[0].raw_name)
         for ilevel, level in enumerate(self.levels(min_level=1)):
             ret_str += "\n\tOn level {} there are {} packages".format(
                 ilevel+1, len(level))
@@ -393,8 +413,19 @@ def main():
                         "style configuration", required=False)
     parser.add_argument("--configsection", "-s", help="section from ini file "
                         "to read")
-    parser.add_argument("--output", "-o", help="output filename, will be "
-                        "a png", default="frame.png", required=False)
+    parser.add_argument("--output", "-o", help="output filename, "
+                        "default is 'frame.png'. "
+                        "Output filename extension determines the output "
+                        "format. Common supported formats include: "
+                        "png, jpg, pdf, and svg. For a full list of "
+                        "supported formats, see "
+                        "matplotlib.pyplot.savefig() documentation. "
+                        "In addition to savefig() supported output "
+                        "formats, the tool supports output in csv to "
+                        "allow post-processing the output data. Specify "
+                        "output file with .csv extension to output the "
+                        "result in textual csv format."
+                        , default="frame.png", required=False)
     parser.add_argument('--verbose', dest='verbose', action='store_true')
     parser.add_argument('--no-verbose', dest='verbose', action='store_false')
     parser.set_defaults(verbose=False)

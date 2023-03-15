@@ -65,7 +65,7 @@ The command line options have the following meanings:
    * `packages`: Add any number of positional arguments, specifying full paths to nix store objects.  This packages will be graphed.
    * `--configfile`, or `-c`:  A configuration file in .ini format
    * `--configsection`, or `-s`: If the configuration file contains more than one section, you must specify this option
-   * `--output`, or `-o`: The name of the png file to output (defaults to nix-tree.png)
+   * `--output`, or `-o`: The name of the output file (defaults to frame.png). Output filename extension determines the output format. Common supported formats include: png, jpg, pdf, and svg. For a full list of supported formats, see [matplotlib.pyplot.savefig](https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.savefig.html). In addition to [matplotlib.pyplot.savefig](https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.savefig.html) supported output formats, the tool supports output in csv format to allow post-processing the output data. Specify output file with .csv extension to output the result in textual csv format.
    * `--verbose`: If this flag is present then print extra information to stdout.
 
 ## Configuration Files

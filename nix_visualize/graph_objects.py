@@ -9,8 +9,8 @@ class Edge(object):
     def __init__(self, node_from, node_to):
         self.nfrom_raw=node_from
         self.nto_raw=node_to
-        self.nfrom = util.remove_nix_hash(os.path.basename(self.nfrom_raw))
-        self.nto = util.remove_nix_hash(os.path.basename(self.nto_raw))
+        self.nfrom = os.path.basename(self.nfrom_raw)
+        self.nto = os.path.basename(self.nto_raw)
 
     def __repr__(self):
         return "{} -> {}".format(self.nfrom, self.nto)
@@ -21,7 +21,6 @@ class Node(object):
 
     def __init__(self, name):
         self.raw_name = name
-        self.name = util.remove_nix_hash(self.raw_name)
         self.children = []
         self.parents = []
         self.in_degree = 0
@@ -56,14 +55,21 @@ class Node(object):
             return 0
 
     def __repr__(self):
-            return self.name
+        return util.remove_nix_hash(self.raw_name)
 
     def __hash__(self):
         """A package is uniquely identified by its name"""
-        return hash((self.name,))
+        return hash((self.raw_name,))
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
-            return self.name == other.name
+            return self.raw_name == other.raw_name
         else:
             return False
+
+    def to_dict(self):
+        """Return Node as dictionary"""
+        return {
+            'raw_name': self.raw_name,
+            'level': self.level,
+        }
