@@ -19,7 +19,7 @@ setuptools.setup(
         "matplotlib>=1.5",
         "networkx>=1.11",
         "pygraphviz>=1.3",
-        "pandas>=1.5"
+        "pandas>=1.4"
     ],
     data_files = [],
     entry_points={"console_scripts": [
