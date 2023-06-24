@@ -3,7 +3,7 @@ import setuptools
 import sys
 
 PACKAGE_NAME = "nix_visualize"
-VERSION = "1.0.4"
+VERSION = "1.0.5"
 setuptools.setup(
     name=PACKAGE_NAME,
     version=VERSION,
@@ -18,7 +18,8 @@ setuptools.setup(
     install_requires=[
         "matplotlib>=1.5",
         "networkx>=1.11",
-        "pygraphviz>=1.3"
+        "pygraphviz>=1.3",
+        "pandas>=1.4"
     ],
     data_files = [],
     entry_points={"console_scripts": [
