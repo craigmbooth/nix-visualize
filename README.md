@@ -25,6 +25,14 @@ The configuration parameters to generate all of these images are provided in [co
 
 ### Nix Installation (preferred)
 
+#### Flakes
+
+This project has a flake that outputs `packages.${system}.nix-visualize` which is also the default package.
+
+You can run it like this: `nix run github:craigmbooth/nix-visualize -- <args>`
+
+#### Traditional
+
 The file [default.nix](default.nix) in the root of this directory contains the definition for `nix-visualize`.
 
 So, for example, you could [download the zip file of this repo](https://github.com/craigmbooth/nix-visualize/archive/master.zip) and then unpack it, cd into it and run `nix-build ./default.nix`, after which `./result/bin/nix-visualize` is available.
